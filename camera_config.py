@@ -79,5 +79,6 @@ class CameraManager:
                 ret, _ = cap.read()
                 if ret:
                     available.append(i)
+            if cap is not None:
                 cap.release()
         return available

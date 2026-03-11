@@ -108,45 +108,46 @@ class GUI:
         def _build_camera_manager():
             """Build CameraManager from GUI configuration."""
             manager = CameraManager()
+
+            def _make_camera(cam_type, cam_addr, label):
+                """Create a CameraSource from type and address, with input validation."""
+                if cam_type == 'usb':
+                    try:
+                        idx = int(cam_addr)
+                    except ValueError:
+                        raise ValueError(f"{label}: USB device index must be a number, got '{cam_addr}'")
+                    return CameraSource(source_type='usb', device_index=idx,
+                                        resolution=np.array((1200, 1600)), label=label)
+                else:
+                    return CameraSource(source_type='ip', address=cam_addr,
+                                        resolution=np.array((1200, 1600)), label=label)
+
             # Primary camera (required)
             cam_type = self.camera_type.get()
             cam_addr = self.camera_address.get()
-            if cam_type == 'usb':
-                cam = CameraSource(source_type='usb', device_index=int(cam_addr),
-                                   resolution=np.array((1200, 1600)), label='Camera 1')
-            else:
-                cam = CameraSource(source_type='ip', address=cam_addr,
-                                   resolution=np.array((1200, 1600)), label='Camera 1')
-            manager.add_camera(cam)
+            manager.add_camera(_make_camera(cam_type, cam_addr, 'Camera 1'))
 
             # Optional camera 2
             cam2_type = self.camera2_type.get()
             cam2_addr = self.camera2_address.get()
             if cam2_type in ('ip', 'usb') and cam2_addr:
-                if cam2_type == 'usb':
-                    cam2 = CameraSource(source_type='usb', device_index=int(cam2_addr),
-                                        resolution=np.array((1200, 1600)), label='Camera 2')
-                else:
-                    cam2 = CameraSource(source_type='ip', address=cam2_addr,
-                                        resolution=np.array((1200, 1600)), label='Camera 2')
-                manager.add_camera(cam2)
+                manager.add_camera(_make_camera(cam2_type, cam2_addr, 'Camera 2'))
 
             # Optional camera 3
             cam3_type = self.camera3_type.get()
             cam3_addr = self.camera3_address.get()
             if cam3_type in ('ip', 'usb') and cam3_addr:
-                if cam3_type == 'usb':
-                    cam3 = CameraSource(source_type='usb', device_index=int(cam3_addr),
-                                        resolution=np.array((1200, 1600)), label='Camera 3')
-                else:
-                    cam3 = CameraSource(source_type='ip', address=cam3_addr,
-                                        resolution=np.array((1200, 1600)), label='Camera 3')
-                manager.add_camera(cam3)
+                manager.add_camera(_make_camera(cam3_type, cam3_addr, 'Camera 3'))
 
             return manager
 
         def _start_game():
-            self.camera_manager = _build_camera_manager()
+            try:
+                self.camera_manager = _build_camera_manager()
+            except ValueError as e:
+                from tkinter import messagebox
+                messagebox.showerror("Camera Error", str(e))
+                return
             self.scorer = GameLogic(self.game_type.get(), [player.get() for player in self.player_names], self.starting_score.get(), self.legs.get(), self.call_scores.get())
             self._game_screen()
             primary_cam = self.camera_manager.get_primary_camera()
