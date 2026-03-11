@@ -1,7 +1,9 @@
 from ultralytics import YOLO
 from get_scores import GetScores
+from camera_config import CameraSource
 
 import numpy as np
+import cv2
 import time
 
 class VideoProcessing:
@@ -101,6 +103,25 @@ class VideoProcessing:
                         self.dart_coords_in_visit.append(best_pred)
 
 
+    def _get_results_stream(self, camera_source):
+        """Get YOLO results stream from a camera source.
+
+        Supports both IP webcams (HTTP streams) and USB webcams (device indices).
+        """
+        if isinstance(camera_source, CameraSource):
+            source = camera_source.get_yolo_source()
+        elif isinstance(camera_source, int):
+            # Legacy: direct device index for USB webcam
+            source = camera_source
+        elif isinstance(camera_source, str):
+            # Legacy: IP address string
+            source = 'http://' + camera_source + '/video'
+        else:
+            raise ValueError(f"Unsupported source type: {type(camera_source)}")
+
+        return self.model(source, stream=True, verbose=False)
+
+
     def start(self, GUI, source, scorer, resolution:np.array):
         self.scorer = scorer
         self.num_corrections = 0
@@ -120,7 +141,7 @@ class VideoProcessing:
         prev_frame_time = 0
         new_frame_time = 0
 
-        results = self.model('http://'+source+'/video', stream=True, verbose=False)
+        results = self._get_results_stream(source)
 
         for result in results:
 
