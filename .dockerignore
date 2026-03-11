@@ -1,0 +1,9 @@
+.git
+.history
+.idea
+.venv
+__pycache__/
+*.pyc
+runs/
+data/darts/
+images/

@@ -9,8 +9,10 @@ A YOLOv8 object detection model was trained to detect dart positions and board c
 
 ## Setup
 1. Clone the repository: `git clone https://github.com/bnww/dart-sense.git`
-2. Install the required dependencies: `npm install requirements.txt`
-3. Download 'IP Webcam' on your smartphone so that you can stream video from your smartphone camera to the app for processing.
+2. Create and activate a Python virtual environment (recommended Python 3.10-3.12): `python -m venv .venv` then `source .venv/bin/activate` (Linux/macOS) or `.venv\Scripts\activate` (Windows PowerShell)
+3. Install dependencies: `pip install ultralytics opencv-python numpy pillow pandas pyttsx3 path.py`
+4. For training + Docker/Windows GPU setup, see `modelTraining.md`.
+5. Download 'IP Webcam' on your smartphone so that you can stream video from your smartphone camera to the app for processing.
 
 ## Features
 - Automatic scoring works on any dart board and with any darts!
@@ -37,7 +39,7 @@ A small sample of images and respective labels can be found in the `data` folder
 
 `prepare_data.py` shows the pre-processing steps taken.
 
-Training script in `training` folder. This would need altering before attempting to train on your own machine.
+Training scripts are in the `training` folder. See `modelTraining.md` for local + Docker GPU training.
 
 `accuracy.py` computes the accuracy metrics based on the input predictions and the ground truth data.
 

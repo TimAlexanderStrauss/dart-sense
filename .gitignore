@@ -3,3 +3,5 @@
 GUI_colour_scores.py
 __pycache__/
 .venv/
+runs/
+.yolo/

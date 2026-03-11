@@ -1,0 +1,23 @@
+services:
+  trainer:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.train
+    image: dart-sense-train:latest
+    working_dir: /workspace
+    environment:
+      - YOLO_CONFIG_DIR=/workspace/.yolo
+    volumes:
+      - ./:/workspace
+    gpus: all
+    command: >
+      yolo detect train
+      data=data/d1_to_d7.docker.yaml
+      model=yolov8n.pt
+      epochs=100
+      imgsz=800
+      batch=16
+      workers=8
+      device=0
+      project=runs
+      name=baseline_n

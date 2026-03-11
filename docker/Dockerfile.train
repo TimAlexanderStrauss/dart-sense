@@ -1,0 +1,8 @@
+FROM ultralytics/ultralytics:latest
+
+WORKDIR /workspace
+
+# Keep Ultralytics settings local to the mounted project directory.
+ENV YOLO_CONFIG_DIR=/workspace/.yolo
+
+CMD ["yolo", "help"]
