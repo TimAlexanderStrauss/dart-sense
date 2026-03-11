@@ -2,6 +2,7 @@
 from video_processing import VideoProcessing
 from game_logic import GameLogic
 from get_scores import GetScores
+from camera_config import CameraSource, CameraManager
 
 import cv2
 import numpy as np
@@ -55,23 +56,101 @@ class GUI:
         call_scores_checkbutton = ttk.Checkbutton(self.menu_frame, variable=self.call_scores)
         call_scores_checkbutton.grid(column=2, row=5, sticky=W)
 
-        # create widget for ip webcam source
-        ttk.Label(self.menu_frame, text="Webcam IP:").grid(column=1, row=6, sticky=W)
-        self.ip = StringVar(self.menu_frame, "192.168.0.56:8080")
-        ip_entry = ttk.Entry(self.menu_frame, width=15, textvariable=self.ip)
-        ip_entry.grid(column=2, row=6, sticky=(W, E))
+        # camera configuration section
+        ttk.Label(self.menu_frame, text="Camera type:").grid(column=1, row=6, sticky=W)
+        self.camera_type = StringVar(self.menu_frame, "ip")
+        camera_type_combobox = ttk.Combobox(self.menu_frame, textvariable=self.camera_type,
+                                            values=["ip", "usb"], width=12)
+        camera_type_combobox.grid(column=2, row=6, sticky=(W, E))
+
+        ttk.Label(self.menu_frame, text="IP / USB index:").grid(column=1, row=7, sticky=W)
+        self.camera_address = StringVar(self.menu_frame, "192.168.0.56:8080")
+        camera_address_entry = ttk.Entry(self.menu_frame, width=15, textvariable=self.camera_address)
+        camera_address_entry.grid(column=2, row=7, sticky=(W, E))
+
+        def _on_camera_type_change(*args):
+            if self.camera_type.get() == 'usb':
+                self.camera_address.set("0")
+            else:
+                self.camera_address.set("192.168.0.56:8080")
+        camera_type_combobox.bind("<<ComboboxSelected>>", _on_camera_type_change)
+
+        # additional cameras (optional)
+        ttk.Label(self.menu_frame, text="Camera 2 type:").grid(column=1, row=8, sticky=W)
+        self.camera2_type = StringVar(self.menu_frame, "")
+        camera2_type_combobox = ttk.Combobox(self.menu_frame, textvariable=self.camera2_type,
+                                             values=["", "ip", "usb"], width=12)
+        camera2_type_combobox.grid(column=2, row=8, sticky=(W, E))
+
+        ttk.Label(self.menu_frame, text="Cam 2 IP/index:").grid(column=1, row=9, sticky=W)
+        self.camera2_address = StringVar(self.menu_frame, "")
+        camera2_address_entry = ttk.Entry(self.menu_frame, width=15, textvariable=self.camera2_address)
+        camera2_address_entry.grid(column=2, row=9, sticky=(W, E))
+
+        ttk.Label(self.menu_frame, text="Camera 3 type:").grid(column=1, row=10, sticky=W)
+        self.camera3_type = StringVar(self.menu_frame, "")
+        camera3_type_combobox = ttk.Combobox(self.menu_frame, textvariable=self.camera3_type,
+                                             values=["", "ip", "usb"], width=12)
+        camera3_type_combobox.grid(column=2, row=10, sticky=(W, E))
+
+        ttk.Label(self.menu_frame, text="Cam 3 IP/index:").grid(column=1, row=11, sticky=W)
+        self.camera3_address = StringVar(self.menu_frame, "")
+        camera3_address_entry = ttk.Entry(self.menu_frame, width=15, textvariable=self.camera3_address)
+        camera3_address_entry.grid(column=2, row=11, sticky=(W, E))
 
         # tick button for demo mode
-        ttk.Label(self.menu_frame, text="Demo mode:").grid(column=1, row=7, sticky=W)
+        ttk.Label(self.menu_frame, text="Demo mode:").grid(column=1, row=12, sticky=W)
         self.demo_mode = BooleanVar(self.menu_frame, False)
         demo_mode_checkbutton = ttk.Checkbutton(self.menu_frame, variable=self.demo_mode)
-        demo_mode_checkbutton.grid(column=2, row=7, sticky=W)
+        demo_mode_checkbutton.grid(column=2, row=12, sticky=W)
 
+
+        def _build_camera_manager():
+            """Build CameraManager from GUI configuration."""
+            manager = CameraManager()
+            # Primary camera (required)
+            cam_type = self.camera_type.get()
+            cam_addr = self.camera_address.get()
+            if cam_type == 'usb':
+                cam = CameraSource(source_type='usb', device_index=int(cam_addr),
+                                   resolution=np.array((1200, 1600)), label='Camera 1')
+            else:
+                cam = CameraSource(source_type='ip', address=cam_addr,
+                                   resolution=np.array((1200, 1600)), label='Camera 1')
+            manager.add_camera(cam)
+
+            # Optional camera 2
+            cam2_type = self.camera2_type.get()
+            cam2_addr = self.camera2_address.get()
+            if cam2_type in ('ip', 'usb') and cam2_addr:
+                if cam2_type == 'usb':
+                    cam2 = CameraSource(source_type='usb', device_index=int(cam2_addr),
+                                        resolution=np.array((1200, 1600)), label='Camera 2')
+                else:
+                    cam2 = CameraSource(source_type='ip', address=cam2_addr,
+                                        resolution=np.array((1200, 1600)), label='Camera 2')
+                manager.add_camera(cam2)
+
+            # Optional camera 3
+            cam3_type = self.camera3_type.get()
+            cam3_addr = self.camera3_address.get()
+            if cam3_type in ('ip', 'usb') and cam3_addr:
+                if cam3_type == 'usb':
+                    cam3 = CameraSource(source_type='usb', device_index=int(cam3_addr),
+                                        resolution=np.array((1200, 1600)), label='Camera 3')
+                else:
+                    cam3 = CameraSource(source_type='ip', address=cam3_addr,
+                                        resolution=np.array((1200, 1600)), label='Camera 3')
+                manager.add_camera(cam3)
+
+            return manager
 
         def _start_game():
+            self.camera_manager = _build_camera_manager()
             self.scorer = GameLogic(self.game_type.get(), [player.get() for player in self.player_names], self.starting_score.get(), self.legs.get(), self.call_scores.get())
             self._game_screen()
-            self.video_processing.start(self, self.ip.get(), self.scorer, np.array((1200, 1600)))
+            primary_cam = self.camera_manager.get_primary_camera()
+            self.video_processing.start(self, primary_cam, self.scorer, primary_cam.resolution)
 
         # use number of players to create entry boxes for player names
         def update_player_names():
@@ -97,7 +176,7 @@ class GUI:
 
         # create button to allow user to add player names
         add_player_names_button = ttk.Button(self.menu_frame, text="Next", command=update_player_names)
-        add_player_names_button.grid(column=2, row=8, sticky=W, columnspan=2)
+        add_player_names_button.grid(column=2, row=13, sticky=W, columnspan=2)
         self.root.bind("<Return>", lambda e: add_player_names_button.invoke())
         self.root.mainloop()
     
