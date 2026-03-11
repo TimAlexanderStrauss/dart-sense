@@ -116,8 +116,11 @@ class GUI:
                         idx = int(cam_addr)
                     except ValueError:
                         raise ValueError(f"{label}: USB device index must be a number, got '{cam_addr}'")
-                    return CameraSource(source_type='usb', device_index=idx,
-                                        resolution=np.array((1200, 1600)), label=label)
+                    cam = CameraSource(source_type='usb', device_index=idx,
+                                       resolution=np.array((1200, 1600)), label=label)
+                    # Auto-detect the actual resolution reported by the device
+                    cam.resolution = cam.get_actual_resolution()
+                    return cam
                 else:
                     return CameraSource(source_type='ip', address=cam_addr,
                                         resolution=np.array((1200, 1600)), label=label)
@@ -150,8 +153,7 @@ class GUI:
                 return
             self.scorer = GameLogic(self.game_type.get(), [player.get() for player in self.player_names], self.starting_score.get(), self.legs.get(), self.call_scores.get())
             self._game_screen()
-            primary_cam = self.camera_manager.get_primary_camera()
-            self.video_processing.start(self, primary_cam, self.scorer, primary_cam.resolution)
+            self.video_processing.start(self, self.camera_manager, self.scorer)
 
         # use number of players to create entry boxes for player names
         def update_player_names():
