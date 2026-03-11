@@ -31,6 +31,29 @@ class CameraSource:
         else:
             return self.device_index
 
+    def get_actual_resolution(self):
+        """Return the actual camera resolution as ``np.array((width, height))``.
+
+        For USB cameras, reads width and height directly from the device via
+        ``cv2.CAP_PROP_FRAME_WIDTH`` / ``cv2.CAP_PROP_FRAME_HEIGHT``.  Falls
+        back to the stored ``resolution`` attribute when the device cannot be
+        opened or reports invalid values.
+
+        The returned array uses ``(width, height)`` order, consistent with the
+        default ``np.array((1200, 1600))`` used elsewhere in the codebase, where
+        ``resolution[0]`` scales the horizontal (x) axis and ``resolution[1]``
+        scales the vertical (y) axis.
+        """
+        if self.source_type == 'usb':
+            cap = cv2.VideoCapture(self.device_index)
+            if cap.isOpened():
+                width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+                height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+                cap.release()
+                if width > 0 and height > 0:
+                    return np.array((width, height))
+        return self.resolution
+
     def __repr__(self):
         if self.source_type == 'ip':
             return f"CameraSource(type=ip, address={self.address}, label={self.label})"

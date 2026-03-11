@@ -32,16 +32,28 @@ dart-sense/
 
 ### Core Processing Pipeline
 
+**Single camera (1 camera configured):**
 ```
-Camera Stream → YOLO Detection → Coordinate Extraction → Homography Transform → Score Calculation
+Camera Stream → YOLO Streaming → Coordinate Extraction → Homography → Score Calculation
 ```
 
-1. **Camera Input** (`video_processing.py`): Receives frames from IP webcam or USB camera
-2. **Object Detection** (`video_processing.py` + YOLO): Detects darts (class 4) and 6 calibration points (classes 0–3, 5–6)
-3. **Coordinate Extraction** (`get_scores.py:process_yolo_output`): Extracts normalized bounding box centers
-4. **Homography Transform** (`get_scores.py:find_homography`): Uses cv2.findHomography with calibration points to map image coordinates to a standardized board plane
-5. **Score Calculation** (`get_scores.py:score`): Computes angle and distance from board center to determine segment number and scoring region (single/double/triple/bull/miss)
-6. **Prediction Smoothing** (`video_processing.py:_process_predictions`): 5-frame FIFO queue with repeat threshold of 3 for stable detections
+**Multi-camera (2–3 cameras configured):**
+```
+CameraThread 1 ──┐
+CameraThread 2 ──┼── model.predict(batch) ── Per-camera homography + transform
+CameraThread 3 ──┘                                          │
+                                          Confidence-weighted fusion (clustering)
+                                                            │
+                                                    Score Calculation
+```
+
+1. **Camera Input** (`video_processing.py`, `camera_config.py`): Captures frames from IP or USB cameras. USB resolution is auto-detected via `CameraSource.get_actual_resolution()`. Multi-camera uses `CameraThread` background threads.
+2. **Object Detection** (`video_processing.py` + YOLO): Detects darts (class 4) and 6 calibration points (classes 0–3, 5–6). Multi-camera: batch inference via `model.predict(frames)`.
+3. **Coordinate Extraction** (`get_scores.py:process_yolo_output`): Extracts normalized bounding box centers.
+4. **Homography Transform** (`get_scores.py:find_homography`): Per-camera homography maps each camera's image coordinates to the board plane.
+5. **Fusion** (`video_processing.py:_fuse_detections_confidence_weighted`): Clusters board-plane detections across cameras; final position is confidence-weighted average. Darts seen by only one camera are included (occlusion recovery).
+6. **Score Calculation** (`get_scores.py:score`): Computes angle and distance from board centre to determine segment and scoring region.
+7. **Prediction Smoothing** (`video_processing.py:_process_predictions`): 5-frame FIFO queue with repeat threshold of 3 for stable detections.
 
 ### GUI Architecture
 
@@ -81,14 +93,14 @@ The "Save data" feature exports images and labels in YOLO format, enabling conti
 
 ## Weaknesses
 
-### 1. Single-Camera Architecture
-The system is designed for a single camera stream. The processing loop in `video_processing.py` is inherently single-threaded and sequential. Multi-camera support requires significant architectural changes (threaded capture, frame synchronization, detection fusion).
+### 1. Multi-Camera Architecture (partially addressed)
+Multi-camera support is now implemented: `CameraThread` provides per-camera background capture, batch YOLO inference processes all frames together, and confidence-weighted fusion combines detections from all cameras in the board plane.  Remaining gaps: per-camera user calibration in the GUI, timestamp-based frame synchronisation, and a camera-switcher UI.
 
 ### 2. No Automated Tests
-There are **no unit tests, integration tests, or test framework**. The only validation is `accuracy.py` which runs offline on pre-saved predictions. This makes refactoring risky and makes it difficult to verify that changes don't break existing functionality.
+There are **no unit tests, integration tests, or test framework** for the main application.  Core multi-camera logic (`_fuse_detections_confidence_weighted`, `CameraSource.get_actual_resolution`) is covered by standalone tests.  A full test framework (pytest) would make refactoring safer.
 
-### 3. Hardcoded Resolution
-The camera resolution is hardcoded to `(1200, 1600)` in the GUI's `_start_game()` method. Different cameras (especially USB webcams) may have different resolutions, leading to incorrect coordinate transformations.
+### 3. USB Camera Resolution Auto-Detected
+~~The camera resolution is hardcoded to `(1200, 1600)`.~~  USB cameras now auto-detect their actual resolution via `CameraSource.get_actual_resolution()` using `cv2.CAP_PROP_FRAME_WIDTH/HEIGHT`.  IP cameras still default to `(1200, 1600)`.
 
 ### 4. Tight Coupling Between GUI and Video Processing
 `video_processing.py:start()` directly calls `GUI._display_graphics()` inside the processing loop. This makes it impossible to use the video processing module independently (e.g., for headless testing, multi-camera processing, or alternative UIs).
@@ -195,10 +207,10 @@ The system detects 6 calibration points (corners of segments 20, 3, 11, 6, 9, 15
 
 Dart Sense is a well-conceived project with a solid foundation in computer vision and dart board geometry. The homography-based scoring approach is robust and elegant. The main areas for improvement are:
 
-1. **Multi-camera support** (now infrastructure is in place, see `nextSteps.md`)
+1. **Multi-camera support** — implemented: `CameraThread` (threaded capture), batch YOLO inference, and confidence-weighted fusion across up to 3 USB/IP cameras.  Remaining: per-camera calibration UI, frame synchronisation, camera switcher.
 2. **Automated testing** (to enable confident refactoring)
 3. **Decoupling video processing from the GUI** (for flexibility)
 4. **Model upgrades** (newer YOLO versions, keypoint detection, SAHI)
 5. **Tracking integration** (ByteTrack for temporal consistency)
 
-The addition of USB webcam support and multi-camera configuration is the first step toward a more capable multi-view dart detection system.
+The multi-camera implementation uses **confidence-weighted fusion**: YOLO detections from all cameras are transformed to the board plane via per-camera homography, clustered by proximity, and merged using confidence-score weights.  This naturally handles occlusion recovery (darts visible to only one camera are included) and noise rejection (cameras with blurry or partially-occluded views contribute less).  Single-camera usage retains the original YOLO streaming path unchanged.
