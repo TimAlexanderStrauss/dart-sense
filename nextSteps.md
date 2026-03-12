@@ -229,11 +229,14 @@ split_dataset("d3_sharpened", val_frac=0.1, test_frac=0.15)
 # Check that all referenced directories exist
 Get-ChildItem data/darts/images -Recurse -Directory | Select-Object FullName
 
-# Quick Docker GPU check
+# Quick Docker GPU check (--gpus is the 'docker run' syntax; docker-compose uses deploy.resources)
 docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
 
-# Start training
+# Start training (via PowerShell helper script)
 .\training\train_docker.ps1
+
+# Or via Docker Compose (uses deploy.resources.reservations.devices for GPU access)
+docker compose -f docker-compose.train.yml up --build
 ```
 
 ---
