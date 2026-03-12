@@ -92,11 +92,161 @@ Frames from different cameras are collected at the time of the main-loop iterati
 
 ---
 
+## Data Collection & Dataset Setup for Training
+
+This section describes how to obtain, organise, and prepare the training data so that the training scripts (`training/train_docker.ps1`, `training/train_docker.sh`, `training/train_optimal.sh`) work out of the box.
+
+### 1. Obtain the Data
+
+The project was trained on ~24,000 images from two sources:
+
+1. **McNally et al. (DeepDarts) — ~16,000 images (D1, D2)**
+   - Paper: [DeepDarts: Modeling Keypoints as Objects for Automatic Scorekeeping in Darts using a Single Camera](https://arxiv.org/abs/2105.09880)
+   - Dataset download: [IEEE Dataport — DeepDarts Dataset](https://ieee-dataport.org/open-access/deepdarts-dataset)
+   - Download **`images.zip`** (original) or **`cropped_images.zip`** (already 800×800).
+   - These images form datasets **d1** and **d2** in the YAML configs.
+
+2. **Self-collected data — ~8,000 images (D3–D7)**
+   - Collected from YouTube videos and personal playing setups.
+   - Various camera angles, dart types, board types, lighting conditions.
+
+### 2. Required Directory Structure
+
+The training YAML configs (`data/d1_to_d7.yaml`, `data/d1_to_d7.docker.yaml`) expect the following layout under `data/darts/`:
+
+```
+data/darts/
+├── classes.txt
+├── images/
+│   ├── d1/
+│   │   ├── train/        # ~75% of d1 images
+│   │   ├── val/          # ~10% of d1 images
+│   │   └── test/         # ~15% of d1 images
+│   ├── d2/
+│   │   ├── train/
+│   │   ├── val/
+│   │   └── test/
+│   ├── d3_sharpened/
+│   │   ├── train/
+│   │   ├── val/
+│   │   └── test/
+│   ├── d4_sharpened/
+│   │   ├── train/
+│   │   ├── val/
+│   │   └── test/
+│   ├── d5/
+│   │   ├── val/          # D5 is only used for val/test (unseen data)
+│   │   └── test/
+│   ├── d6_resized/
+│   │   └── completed/
+│   │       ├── train/
+│   │       └── test/
+│   └── d7_resized/
+│       └── completed/
+│           ├── train/
+│           └── test/
+└── labels/
+    ├── d1/
+    │   ├── train/        # One .txt per image, same filename stem
+    │   ├── val/
+    │   └── test/
+    ├── d2/
+    │   ├── train/
+    │   ├── val/
+    │   └── test/
+    ├── d3_sharpened/
+    │   ├── ...
+    ...  (mirrors images/ structure exactly)
+```
+
+Each `labels/<dataset>/<split>/` directory must mirror the corresponding `images/` directory with one `.txt` label file per image.
+
+### 3. YOLO Label Format
+
+Each `.txt` label file contains one line per object:
+
+```
+<class_id> <center_x> <center_y> <width> <height>
+```
+
+- Coordinates are **normalised** (0–1) relative to image width/height.
+- `class_id` mapping (7 classes):
+  | ID | Name |
+  |----|------|
+  | 0  | 20 (calibration point) |
+  | 1  | 3 (calibration point) |
+  | 2  | 11 (calibration point) |
+  | 3  | 6 (calibration point) |
+  | 4  | dart |
+  | 5  | 9 (calibration point) |
+  | 6  | 15 (calibration point) |
+
+- Bounding box size for calibration points and darts: `0.025 0.025` (2.5% of image).
+
+Example label (`d1_IMG_1093.txt`):
+```
+4 0.456789 0.234567 0.025 0.025
+4 0.678901 0.543210 0.025 0.025
+0 0.312345 0.123456 0.025 0.025
+1 0.698765 0.876543 0.025 0.025
+2 0.234567 0.765432 0.025 0.025
+3 0.789012 0.345678 0.025 0.025
+```
+
+### 4. Pre-Processing Steps
+
+Use the functions in `prepare_data.py`:
+
+```python
+from prepare_data import resize_images, sharpen_images, split_dataset, change_bb_size
+
+# 1. Resize all images to 800x800
+resize_images("data/darts/images/d3", size=(800, 800))
+
+# 2. Sharpen lower-resolution images (e.g. from video captures)
+sharpen_images("d3")  # creates d3_sharpened in data/darts/images/
+
+# 3. Standardise bounding box sizes
+change_bb_size("d3_sharpened", bb_size=0.025)
+
+# 4. Split into train/val/test (75/10/15)
+split_dataset("d3_sharpened", val_frac=0.1, test_frac=0.15)
+```
+
+### 5. Labelling New Images
+
+1. Install **LabelImg**: `pip install labelimg`
+2. Open: `labelimg data/darts/images/<your_dataset> data/darts/labels/<your_dataset> data/darts/classes.txt`
+3. Set save format to **YOLO**.
+4. Draw bounding boxes for each dart tip and each visible calibration point.
+5. After labelling, run `change_bb_size("<your_dataset>", bb_size=0.025)` to standardise box sizes.
+
+**Tip:** Once you have a trained model, use it to pre-label new images and then manually correct the predictions. This is much faster than labelling from scratch.
+
+### 6. Verify and Train
+
+```powershell
+# Check that all referenced directories exist
+Get-ChildItem data/darts/images -Recurse -Directory | Select-Object FullName
+
+# Quick Docker GPU check (--gpus is the 'docker run' syntax; docker-compose uses deploy.resources)
+docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+
+# Start training (via PowerShell helper script)
+.\training\train_docker.ps1
+
+# Or via Docker Compose (uses deploy.resources.reservations.devices for GPU access)
+docker compose -f docker-compose.train.yml up --build
+```
+
+---
+
 ## Priority Order (Remaining Work)
 
-1. **Per-camera calibration UI** (accuracy improvement for multi-camera)
-2. **Timestamp-based frame synchronisation** (correctness)
-3. **Camera health / switcher UI** (usability)
-4. **Triangulation** (optional: removes homography dependency)
-5. **Advanced fusion options** (consensus voting)
-6. **Model upgrade** (YOLOv11, RT-DETR)
+1. **Dataset acquisition** (download McNally et al. from IEEE Dataport, collect additional data)
+2. **Per-camera calibration UI** (accuracy improvement for multi-camera)
+3. **Timestamp-based frame synchronisation** (correctness)
+4. **Camera health / switcher UI** (usability)
+5. **Triangulation** (optional: removes homography dependency)
+6. **Advanced fusion options** (consensus voting)
+7. **Model upgrade** (YOLOv11, RT-DETR)

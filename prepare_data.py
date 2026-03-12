@@ -4,7 +4,6 @@ import random
 from PIL import Image
 import cv2
 import numpy as np
-import path
 
 def resize_images(path_to_images, size=(800, 800)):
     for image_name in os.listdir(path_to_images):
@@ -14,7 +13,7 @@ def resize_images(path_to_images, size=(800, 800)):
 
 
 def change_bb_size(ds_name, bb_size=0.025):
-    label_dir = "data\\darts\\labels"
+    label_dir = os.path.join("data", "darts", "labels")
     path_to_labels = os.path.join(label_dir, ds_name)
     for ds_subset in os.listdir(path_to_labels): 
         for label_name in os.listdir(os.path.join(path_to_labels, ds_subset)):
@@ -29,7 +28,7 @@ def change_bb_size(ds_name, bb_size=0.025):
 
 
 def sharpen_images(ds_name, sharpness_multiplier=5):
-    image_dir = "data\\darts\\images"
+    image_dir = os.path.join("data", "darts", "images")
     ds_path = os.path.join(image_dir, ds_name)
     new_ds_path = ds_path + "_sharpened"
     
@@ -54,7 +53,7 @@ def sharpen_images(ds_name, sharpness_multiplier=5):
         
 
 def split_dataset(dataset_name, val_frac=0.1, test_frac=0.15):
-    path_to_data = "data\\darts"
+    path_to_data = os.path.join("data", "darts")
     path_to_labels = os.path.join(path_to_data, 'labels', dataset_name)
     path_to_images = path_to_labels.replace('labels', 'images')
 
