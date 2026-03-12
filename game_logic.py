@@ -11,7 +11,7 @@ class GameLogic:
         self.leg_scores = [0] * self.num_players
         self.scores = [x01] * self.num_players
         self.starting_player, self.current_player = 0, 0
-        #self.point_history = {i: [[] for _ in range(self.num_legs*2 -1)] for i in range(self.num_players)}
+        self.point_history = {i: [[] for _ in range(self.num_legs*2 -1)] for i in range(self.num_players)}
         self.num_dart_history = np.zeros((self.num_players, self.num_legs*2 - 1))
         self.num_visits_history = np.zeros((self.num_players, self.num_legs*2 - 1))
         self.averages = np.zeros(self.num_players)
@@ -70,7 +70,7 @@ class GameLogic:
         
         if self.scores[self.current_player] == 0 and darts[-1][0] == 'D': # check out
             self.num_dart_history[self.current_player][np.sum(self.leg_scores)] += len(darts)
-            self.averages[self.current_player] = ((self.averages[self.current_player] * num_visits-1) / num_visits) + ((points * 3/len(darts))/num_visits) 
+            self.averages[self.current_player] = ((self.averages[self.current_player] * (num_visits-1)) / num_visits) + ((points * 3/len(darts))/num_visits) 
             self.leg_scores[self.current_player] += 1
             self.scores = [self.x01] * self.num_players
             self.starting_player = (self.starting_player + 1) % self.num_players

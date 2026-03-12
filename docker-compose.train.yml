@@ -9,7 +9,13 @@ services:
       - YOLO_CONFIG_DIR=/workspace/.yolo
     volumes:
       - ./:/workspace
-    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     command: >
       yolo detect train
       data=data/d1_to_d7.docker.yaml
